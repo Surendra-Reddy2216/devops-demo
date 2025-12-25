@@ -1,35 +1,53 @@
+pipeline {
+    agent any
 
-        stage('Build Docker Image') {
+    environment {
+        DOCKER_IMAGE = "reddy2216/devops-demo"
+        DOCKER_CREDS = "dockerhub-creds"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
             steps {
-                sh 'docker build -t username/devops-demo:latest .'
+                git branch: 'main',
+                    url: 'https://github.com/Surendra-Reddy2216/devops-demo.git'
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $DOCKER_IMAGE:latest .'
+            }
+        }
+
+        stage('Login to DockerHub') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'USER',
-                    passwordVariable: 'PASS'
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''
-                    docker login -u $USER -p $PASS
-                    docker push username/devops-demo:latest
-                    '''
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                 }
+            }
+        }
+
+        stage('Push Image to DockerHub') {
+            steps {
+                sh 'docker push $DOCKER_IMAGE:latest'
             }
         }
 
         stage('Deploy on EC2') {
             steps {
                 sh '''
-                docker stop demo || true
-                docker rm demo || true
-                docker run -d --name demo -p 5000:5000 username/devops-demo:latest
+                docker stop devops-demo || true
+                docker rm devops-demo || true
+                docker run -d --name devops-demo -p 80:80 $DOCKER_IMAGE:latest
                 '''
             }
         }
     }
 }
-
 
